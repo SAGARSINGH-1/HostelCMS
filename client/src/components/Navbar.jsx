@@ -61,11 +61,11 @@ export default function Navbar() {
                     <div className="flex items-center gap-4">
                         <Link to="/" className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-md bg-[#2C3E50] flex items-center justify-center text-white font-bold">
-                                H
+                                C C
                             </div>
                             <div className="hidden sm:block">
                                 <div className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                                    Hostel CMS
+                                    <span className="text-3xl">C</span>UH <span className="text-3xl">C</span>MS
                                 </div>
                                 <div className="text-xs text-slate-500 dark:text-slate-400">
                                     Complaint Management
@@ -109,7 +109,7 @@ export default function Navbar() {
                         {!isAuthenticated && (
                             <div className="hidden md:block">
                                 <Link to="/login">
-                                    <Button size="sm">
+                                    <Button size="sm" className="p-2">
                                         <Plus className="mr-2 h-4 w-4" /> Login / Signup
                                     </Button>
                                 </Link>
@@ -142,7 +142,7 @@ export default function Navbar() {
                                 <DropdownMenuContent
                                     align="end"
                                     side="bottom"
-                                    className="w-48 dark:bg-gray-800"
+                                    className="w-48 dark:bg-gray-800 "
                                 >
                                     <div className="px-3 py-2 border-b dark:border-gray-700">
                                         <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
@@ -153,12 +153,12 @@ export default function Navbar() {
                                         </div>
                                     </div>
                                     <DropdownMenuItem asChild>
-                                        <Link to="/profile" className="flex items-center gap-2">
+                                        <Link to="/profile" className="flex items-center gap-2 p-1">
                                             <User className="h-4 w-4" /> Profile
                                         </Link>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem asChild>
-                                        <Link to="/settings" className="flex items-center gap-2">
+                                        <Link to="/settings" className="flex items-center gap-2 p-1">
                                             <Search className="h-4 w-4" /> Settings
                                         </Link>
                                     </DropdownMenuItem>
@@ -167,7 +167,7 @@ export default function Navbar() {
                                             e.preventDefault();
                                             handleLogout();
                                         }}
-                                        className="flex items-center gap-2"
+                                        className="flex items-center gap-2 cursor-pointer p-1"
                                     >
                                         <LogOut className="h-4 w-4" /> Logout
                                     </DropdownMenuItem>
@@ -190,7 +190,7 @@ export default function Navbar() {
                                     <div className="flex flex-col gap-4">
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <div className="text-lg font-semibold">Hostel CMS</div>
+                                                <div className="text-lg font-semibold">CUH CMS</div>
                                                 <div className="text-sm text-slate-500 dark:text-slate-400">
                                                     Menu
                                                 </div>
@@ -219,7 +219,7 @@ export default function Navbar() {
                                             {isAuthenticated ? (
                                                 <Button
                                                     onClick={handleLogout}
-                                                    className="w-full"
+                                                    className="w-full cursor-pointer"
                                                 >
                                                     Logout
                                                 </Button>

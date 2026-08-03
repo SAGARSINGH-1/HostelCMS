@@ -6,7 +6,7 @@ import { protect } from "../Middleware/authMiddleware.js";
 const router = express.Router();
 
 // router.use(protect);
-router.get("/", listMyNotifications);
+router.get("/:value", protect(), listMyNotifications);
 router.post("/read-all", markAllRead);
 router.post("/:id/read", markRead);
 

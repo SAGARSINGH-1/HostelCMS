@@ -11,6 +11,9 @@ import {
     Pie,
     Cell,
 } from "recharts";
+import { useNavigate } from "react-router-dom";
+import { CalendarIcon, Plus, Filter, Search, UploadCloud, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -25,42 +28,97 @@ import {
     TableBody,
     TableCell,
 } from "../components/ui/table";
-import { Drawer, DrawerTrigger, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter, DrawerClose } from "../components/ui/drawer";
+import {
+    Drawer,
+    DrawerTrigger,
+    DrawerContent,
+    DrawerHeader,
+    DrawerTitle,
+    DrawerDescription,
+    DrawerFooter,
+    DrawerClose,
+} from "../components/ui/drawer";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "../components/ui/select";
+import CustomSelect from "../components/ui/CustomSelect";
 import { Popover, PopoverTrigger, PopoverContent } from "../components/ui/popover";
 import { Calendar } from "../components/ui/calendar";
+import {
+    Select,
+    SelectTrigger,
+    SelectValue,
+    SelectContent,
+    SelectItem,
+} from "../components/ui/select";
 import { cn } from "../lib/utils";
-import { CalendarIcon, Plus, Filter, Search, UploadCloud } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 
 const API = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
 const Q_BASE = `${API}/api/query`;
 
+const STATUS_OPTIONS = ["all", "pending", "in-progress", "resolved"];
+const TAG_OPTIONS = [
+    "water",
+    "mess",
+    "internet",
+    "washroom",
+    "electricity",
+    "maintenance",
+    "other",
+];
+const SCOPE_OPTIONS = ["room", "floor", "block", "hostel", "campus"];
+
+const PIE_COLORS = {
+    pending: "#eab308",
+    "in-progress": "#3b82f6",
+    resolved: "#22c55e",
+};
+
+const PRIORITY_BADGE = {
+    low: "bg-slate-500",
+    medium: "bg-yellow-500",
+    high: "bg-orange-500",
+    urgent: "bg-red-600",
+};
+
 export default function FacultyDashboard() {
     const navigate = useNavigate();
 
-    // Data
     const [stats, setStats] = useState(null);
     const [rawQueries, setRawQueries] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // Filters
     const [status, setStatus] = useState("all");
     const [tag, setTag] = useState("all");
     const [searchText, setSearchText] = useState("");
     const [dateRange, setDateRange] = useState({ from: null, to: null });
 
-    // Create complaint form state
     const [createOpen, setCreateOpen] = useState(false);
-    const [formTag, setFormTag] = useState("");
+    const [formTag, setFormTag] = useState("other");
     const [formTitle, setFormTitle] = useState("");
     const [formDesc, setFormDesc] = useState("");
+    const [formScope, setFormScope] = useState("room");
+    const [formCampus, setFormCampus] = useState("main-campus");
+    const [formHostel, setFormHostel] = useState("");
+    const [formBlock, setFormBlock] = useState("");
+    const [formFloor, setFormFloor] = useState("");
+    const [formRoomNumber, setFormRoomNumber] = useState("");
     const [formFiles, setFormFiles] = useState([]);
 
-    // Fetch all queries and stats
+    const normalize = (value = "") => String(value || "").trim().toLowerCase();
+
+    const resetForm = () => {
+        setFormTag("other");
+        setFormTitle("");
+        setFormDesc("");
+        setFormScope("room");
+        setFormCampus("main-campus");
+        setFormHostel("");
+        setFormBlock("");
+        setFormFloor("");
+        setFormRoomNumber("");
+        setFormFiles([]);
+    };
+
     const fetchAll = async () => {
         setLoading(true);
         try {
@@ -68,6 +126,7 @@ export default function FacultyDashboard() {
                 fetch(`${Q_BASE}/queries`),
                 fetch(`${Q_BASE}/queries/stats`),
             ]);
+
             const dataQ = await resQ.json();
             const items = Array.isArray(dataQ.items) ? dataQ.items : Array.isArray(dataQ) ? dataQ : [];
             setRawQueries(items);
@@ -75,10 +134,14 @@ export default function FacultyDashboard() {
             if (resS.ok) {
                 const dataS = await resS.json();
                 setStats(dataS);
+            } else {
+                setStats(null);
             }
         } catch (e) {
             console.error("fetchAll error:", e);
-            toast.error("Failed to load data", { description: e.message || "Please try again." });
+            toast.error("Failed to load data", {
+                description: e.message || "Please try again.",
+            });
         } finally {
             setLoading(false);
         }
@@ -88,68 +151,116 @@ export default function FacultyDashboard() {
         fetchAll().catch((e) => console.error(e));
     }, []);
 
-    // Create complaint
     const createComplaint = async () => {
         if (!formTitle.trim()) {
-            toast.message("Missing title", { description: "Please provide a short title." });
+            toast.message("Missing title", {
+                description: "Please provide a short title.",
+            });
             return;
         }
+
+        if (!formDesc.trim()) {
+            toast.message("Missing description", {
+                description: "Please provide complaint details.",
+            });
+            return;
+        }
+
         if (!formTag) {
-            toast.message("Missing tag", { description: "Please select a tag." });
+            toast.message("Missing tag", {
+                description: "Please select a tag.",
+            });
             return;
         }
 
         const fd = new FormData();
-        fd.append("title", formTitle);
-        fd.append("description", formDesc);
-        fd.append("tags", formTag || "other");
-        for (const f of formFiles) fd.append("documents", f);
+        fd.append("title", formTitle.trim());
+        fd.append("description", formDesc.trim());
+        fd.append("tags", normalize(formTag) || "other");
+        fd.append("scope", normalize(formScope) || "room");
+        fd.append("campus", formCampus.trim() || "main-campus");
+        fd.append("hostel", formHostel.trim());
+        fd.append("block", formBlock.trim());
+        fd.append("floor", formFloor.trim());
+        fd.append("roomNumber", formRoomNumber.trim());
+
+        for (const f of formFiles) {
+            fd.append("documents", f);
+        }
 
         try {
-            const res = await fetch(`${Q_BASE}/queries`, { method: "POST", body: fd });
+            const res = await fetch(`${Q_BASE}/queries`, {
+                method: "POST",
+                body: fd,
+            });
+
             if (!res.ok) {
                 const text = await res.text().catch(() => "");
-                toast.error("Failed to create complaint", { description: text || `${res.status} ${res.statusText}` });
+                toast.error("Failed to create complaint", {
+                    description: text || `${res.status} ${res.statusText}`,
+                });
                 return;
             }
-            toast.success("Complaint created", { description: "The complaint has been submitted." });
+
+            const payload = await res.json().catch(() => null);
+
+            if (payload?.duplicateMatched || payload?.duplicateOf) {
+                toast.success("Joined existing complaint", {
+                    description: "A similar complaint already existed, so support count was updated.",
+                });
+            } else {
+                toast.success("Complaint created", {
+                    description: "The complaint has been submitted.",
+                });
+            }
+
             await fetchAll();
             setCreateOpen(false);
-            setFormTag("");
-            setFormTitle("");
-            setFormDesc("");
-            setFormFiles([]);
+            resetForm();
         } catch (e) {
-            toast.error("Create failed", { description: e.message || "Please try again." });
+            toast.error("Create failed", {
+                description: e.message || "Please try again.",
+            });
         }
     };
 
-    // Derived tag options
     const tagOptions = useMemo(() => {
-        const set = new Set();
+        const set = new Set(TAG_OPTIONS);
         for (const it of rawQueries) {
             const tags = Array.isArray(it.tags) ? it.tags : [it.tag].filter(Boolean);
-            tags.forEach((t) => set.add(t));
+            tags.forEach((t) => set.add(normalize(t)));
         }
-        return ["all", ...Array.from(set)];
+        return ["all", ...Array.from(set).filter(Boolean)];
     }, [rawQueries]);
 
-    // Frontend filtering
     const filteredQueries = useMemo(() => {
-        const start = dateRange.from ? new Date(dateRange.from).getTime() : null;
-        const end = dateRange.to ? new Date(dateRange.to).getTime() : null;
-        const q = (searchText || "").trim().toLowerCase();
+        const start = dateRange.from ? new Date(dateRange.from).setHours(0, 0, 0, 0) : null;
+        const end = dateRange.to ? new Date(dateRange.to).setHours(23, 59, 59, 999) : null;
+        const q = normalize(searchText);
 
         return (rawQueries || []).filter((it) => {
             if (status !== "all" && it.status !== status) return false;
 
             if (tag !== "all") {
-                const tags = Array.isArray(it.tags) ? it.tags : [it.tag].filter(Boolean);
-                if (!tags.includes(tag)) return false;
+                const tags = Array.isArray(it.tags) ? it.tags.map(normalize) : [normalize(it.tag)].filter(Boolean);
+                if (!tags.includes(normalize(tag))) return false;
             }
 
             if (q) {
-                const hay = `${it.title || ""} ${it.description || ""}`.toLowerCase();
+                const hay = [
+                    it.title,
+                    it.description,
+                    it.hostel,
+                    it.block,
+                    it.floor,
+                    it.roomNumber,
+                    it.scope,
+                    Array.isArray(it.tags) ? it.tags.join(" ") : it.tag || "",
+                ]
+                    .filter(Boolean)
+                    .join(" ")
+                    .toLowerCase();
+
                 if (!hay.includes(q)) return false;
             }
 
@@ -164,19 +275,28 @@ export default function FacultyDashboard() {
         });
     }, [rawQueries, status, tag, searchText, dateRange]);
 
-    // KPIs
     const totalAll = filteredQueries.length;
     const totalPending = filteredQueries.filter((x) => x.status === "pending").length;
     const totalResolved = filteredQueries.filter((x) => x.status === "resolved").length;
     const totalInProgress = filteredQueries.filter((x) => x.status === "in-progress").length;
 
-    // Charts
+    const totalSupport = filteredQueries.reduce((sum, item) => sum + (item.supportCount || 1), 0);
+    const mergedCount = filteredQueries.filter((item) => item.isMerged || item.duplicateOf).length;
+
     const byTagMap = useMemo(() => {
         return filteredQueries.reduce((acc, it) => {
-            const tags = Array.isArray(it.tags) ? it.tags : [it.tag || "unknown"];
+            const tags = Array.isArray(it.tags) ? it.tags : [it.tag || "other"];
             for (const tg of tags) {
-                if (!acc[tg]) acc[tg] = { tag: tg, resolved: 0, pending: 0, "in-progress": 0 };
-                acc[tg][it.status] = (acc[tg][it.status] || 0) + 1;
+                const key = normalize(tg) || "other";
+                if (!acc[key]) {
+                    acc[key] = {
+                        tag: key,
+                        resolved: 0,
+                        pending: 0,
+                        "in-progress": 0,
+                    };
+                }
+                acc[key][it.status] = (acc[key][it.status] || 0) + 1;
             }
             return acc;
         }, {});
@@ -186,40 +306,68 @@ export default function FacultyDashboard() {
     const hasBarData = tagsData.length > 0 && tagsData.some((d) => d.resolved || d.pending || d["in-progress"]);
 
     const pieData = [
-        { name: "Pending", value: totalPending },
-        { name: "Resolved", value: totalResolved },
-        { name: "All", value: totalAll },
-    ];
-    const hasPieData = pieData.some((d) => d.value > 0);
+        { name: "Pending", key: "pending", value: totalPending },
+        { name: "In-Progress", key: "in-progress", value: totalInProgress },
+        { name: "Resolved", key: "resolved", value: totalResolved },
+    ].filter((d) => d.value > 0);
+
+    const hasPieData = pieData.length > 0;
+
+    const visibleQueries = useMemo(() => {
+        return [...filteredQueries].sort((a, b) => {
+            const priorityOrder = { urgent: 4, high: 3, medium: 2, low: 1 };
+            const pa = priorityOrder[a.priority] || 0;
+            const pb = priorityOrder[b.priority] || 0;
+
+            if (pb !== pa) return pb - pa;
+            return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
+    }, [filteredQueries]);
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-semibold">Faculty Dashboard</h1>
-                    <p className="text-muted-foreground text-sm">Manage complaints and monitor status</p>
+                    <p className="text-muted-foreground text-sm">
+                        Manage complaints, routing, support counts, and status
+                    </p>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="flex flex-wrap items-center gap-2">
                     <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search complaints..."
-                            className="pl-8 w-64"
+                            className="pl-8 w-full md:w-72"
                             value={searchText}
-                            onChange={(e) =>
-                                e.target.value === "" ? setSearchText("") : setSearchText(e.target.value)
-                            }
+                            onChange={(e) => setSearchText(e.target.value)}
                         />
                     </div>
+
                     <Button
                         variant="outline"
                         className="gap-2"
-                        onClick={() => toast.message("Filters applied", { description: "Updated the list below." })}
+                        onClick={() => fetchAll()}
+                        disabled={loading}
+                    >
+                        <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                        Refresh
+                    </Button>
+
+                    <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() =>
+                            toast.message("Filters applied", {
+                                description: "Updated the list below.",
+                            })
+                        }
                     >
                         <Filter className="h-4 w-4" />
                         Apply
                     </Button>
+
                     <Drawer open={createOpen} onOpenChange={setCreateOpen}>
                         <DrawerTrigger asChild>
                             <Button className="gap-2">
@@ -227,25 +375,39 @@ export default function FacultyDashboard() {
                                 New Complaint
                             </Button>
                         </DrawerTrigger>
+
                         <DrawerContent>
                             <div className="mx-auto w-full max-w-2xl">
                                 <DrawerHeader>
                                     <DrawerTitle>Submit Complaint</DrawerTitle>
-                                    <DrawerDescription>Provide details and evidence if any</DrawerDescription>
+                                    <DrawerDescription>
+                                        Add issue details, location, and attachments
+                                    </DrawerDescription>
                                 </DrawerHeader>
-                                <div className="p-6 grid gap-4">
-                                    <div className="grid gap-2">
-                                        <Label>Tag</Label>
-                                        <Select value={formTag} onValueChange={setFormTag}>
-                                            <SelectTrigger><SelectValue placeholder="Choose a tag" /></SelectTrigger>
-                                            <SelectContent>
-                                                {tagOptions.filter((t) => t !== "all").map((t) => (
-                                                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                                                ))}
-                                                <SelectItem value="other">other</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+
+                                <div className="p-6 grid gap-4 max-h-[75vh] overflow-y-auto">
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                            <Label>Tag</Label>
+                                            <CustomSelect
+                                                value={formTag}
+                                                onChange={setFormTag}
+                                                options={TAG_OPTIONS}
+                                                placeholder="Choose a tag"
+                                            />
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <Label>Scope</Label>
+                                            <CustomSelect
+                                                value={formScope}
+                                                onChange={setFormScope}
+                                                options={SCOPE_OPTIONS}
+                                                placeholder="Choose scope"
+                                            />
+                                        </div>
                                     </div>
+
                                     <div className="grid gap-2">
                                         <Label>Title</Label>
                                         <Input
@@ -254,6 +416,7 @@ export default function FacultyDashboard() {
                                             placeholder="Short summary"
                                         />
                                     </div>
+
                                     <div className="grid gap-2">
                                         <Label>Description</Label>
                                         <Textarea
@@ -263,17 +426,69 @@ export default function FacultyDashboard() {
                                             rows={5}
                                         />
                                     </div>
+
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                            <Label>Campus</Label>
+                                            <Input
+                                                value={formCampus}
+                                                onChange={(e) => setFormCampus(e.target.value)}
+                                                placeholder="main-campus"
+                                            />
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <Label>Hostel</Label>
+                                            <Input
+                                                value={formHostel}
+                                                onChange={(e) => setFormHostel(e.target.value)}
+                                                placeholder="e.g. ramanujan hostel"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                            <Label>Block</Label>
+                                            <Input
+                                                value={formBlock}
+                                                onChange={(e) => setFormBlock(e.target.value)}
+                                                placeholder="e.g. A"
+                                            />
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <Label>Floor</Label>
+                                            <Input
+                                                value={formFloor}
+                                                onChange={(e) => setFormFloor(e.target.value)}
+                                                placeholder="e.g. 2"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label>Room Number</Label>
+                                        <Input
+                                            value={formRoomNumber}
+                                            onChange={(e) => setFormRoomNumber(e.target.value)}
+                                            placeholder="e.g. 214"
+                                        />
+                                    </div>
+
                                     <div className="grid gap-2">
                                         <Label>Attachments</Label>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <Button
+                                                type="button"
                                                 variant="outline"
                                                 className="gap-2"
-                                                onClick={() => document.getElementById("file-input").click()}
+                                                onClick={() => document.getElementById("file-input")?.click()}
                                             >
                                                 <UploadCloud className="h-4 w-4" />
                                                 Upload files
                                             </Button>
+
                                             <input
                                                 id="file-input"
                                                 type="file"
@@ -281,22 +496,33 @@ export default function FacultyDashboard() {
                                                 multiple
                                                 onChange={(e) => setFormFiles(Array.from(e.target.files || []))}
                                             />
+
                                             {formFiles?.length ? (
                                                 <span className="text-sm text-muted-foreground">
-                                                    {formFiles.length} file(s)
+                                                    {formFiles.length} file(s) selected
                                                 </span>
                                             ) : null}
                                         </div>
                                     </div>
                                 </div>
+
                                 <DrawerFooter className="flex gap-2">
-                                    <Button onClick={createComplaint} disabled={!formTag || !formTitle}>
+                                    <Button
+                                        onClick={createComplaint}
+                                        disabled={!formTag || !formTitle.trim() || !formDesc.trim()}
+                                    >
                                         Submit
                                     </Button>
+
                                     <DrawerClose asChild>
                                         <Button
                                             variant="outline"
-                                            onClick={() => toast.message("Cancelled", { description: "Form was closed." })}
+                                            onClick={() => {
+                                                resetForm();
+                                                toast.message("Cancelled", {
+                                                    description: "Form was closed.",
+                                                });
+                                            }}
                                         >
                                             Cancel
                                         </Button>
@@ -308,40 +534,50 @@ export default function FacultyDashboard() {
                 </div>
             </div>
 
-            {/* Filters */}
             <Card>
-                <CardHeader><CardTitle>Filters</CardTitle></CardHeader>
+                <CardHeader>
+                    <CardTitle>Filters</CardTitle>
+                </CardHeader>
+
                 <CardContent className="grid md:grid-cols-4 gap-4">
                     <div className="grid gap-2">
                         <Label>Status</Label>
                         <Select value={status} onValueChange={setStatus}>
-                            <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All</SelectItem>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="in-progress">In-Progress</SelectItem>
-                                <SelectItem value="resolved">Resolved</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>Tag</Label>
-                        <Select value={tag} onValueChange={setTag}>
-                            <SelectTrigger><SelectValue placeholder="Select tag" /></SelectTrigger>
-                            <SelectContent>
-                                {tagOptions.map((t) => (
-                                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                                {STATUS_OPTIONS.map((item) => (
+                                    <SelectItem key={item} value={item}>
+                                        {item === "in-progress"
+                                            ? "In-Progress"
+                                            : item.charAt(0).toUpperCase() + item.slice(1)}
+                                    </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
+
+                    <div className="grid gap-2">
+                        <Label>Tag</Label>
+                        <CustomSelect
+                            value={tag}
+                            onChange={setTag}
+                            options={tagOptions}
+                            placeholder="Select tag"
+                        />
+                    </div>
+
                     <div className="grid gap-2">
                         <Label>Date from</Label>
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button
                                     variant="outline"
-                                    className={cn("justify-start text-left font-normal", !dateRange.from && "text-muted-foreground")}
+                                    className={cn(
+                                        "justify-start text-left font-normal",
+                                        !dateRange.from && "text-muted-foreground"
+                                    )}
                                 >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
                                     {dateRange.from ? dateRange.from.toDateString() : "Pick a date"}
@@ -357,13 +593,17 @@ export default function FacultyDashboard() {
                             </PopoverContent>
                         </Popover>
                     </div>
+
                     <div className="grid gap-2">
                         <Label>Date to</Label>
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button
                                     variant="outline"
-                                    className={cn("justify-start text-left font-normal", !dateRange.to && "text-muted-foreground")}
+                                    className={cn(
+                                        "justify-start text-left font-normal",
+                                        !dateRange.to && "text-muted-foreground"
+                                    )}
                                 >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
                                     {dateRange.to ? dateRange.to.toDateString() : "Pick a date"}
@@ -382,30 +622,56 @@ export default function FacultyDashboard() {
                 </CardContent>
             </Card>
 
-            {/* KPIs */}
-            <section className="grid md:grid-cols-4 gap-4">
+            <section className="grid md:grid-cols-5 gap-4">
                 <Card>
-                    <CardHeader><CardTitle>Total</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle>Total</CardTitle>
+                    </CardHeader>
                     <CardContent className="text-3xl font-bold">{totalAll}</CardContent>
                 </Card>
+
                 <Card>
-                    <CardHeader><CardTitle>Pending</CardTitle></CardHeader>
-                    <CardContent className="text-3xl font-bold text-yellow-500">{totalPending}</CardContent>
+                    <CardHeader>
+                        <CardTitle>Pending</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-3xl font-bold text-yellow-500">
+                        {totalPending}
+                    </CardContent>
                 </Card>
+
                 <Card>
-                    <CardHeader><CardTitle>In-Progress</CardTitle></CardHeader>
-                    <CardContent className="text-3xl font-bold text-blue-500">{totalInProgress}</CardContent>
+                    <CardHeader>
+                        <CardTitle>In-Progress</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-3xl font-bold text-blue-500">
+                        {totalInProgress}
+                    </CardContent>
                 </Card>
+
                 <Card>
-                    <CardHeader><CardTitle>Resolved</CardTitle></CardHeader>
-                    <CardContent className="text-3xl font-bold text-green-600">{totalResolved}</CardContent>
+                    <CardHeader>
+                        <CardTitle>Resolved</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-3xl font-bold text-green-600">
+                        {totalResolved}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Total Support</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-3xl font-bold text-purple-600">
+                        {totalSupport}
+                    </CardContent>
                 </Card>
             </section>
 
-            {/* Charts */}
             <section className="grid md:grid-cols-2 gap-6">
                 <Card>
-                    <CardHeader><CardTitle>Complaints by Tags</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle>Complaints by Tags</CardTitle>
+                    </CardHeader>
                     <CardContent className="h-80">
                         {hasBarData ? (
                             <ResponsiveContainer width="100%" height="100%">
@@ -428,18 +694,28 @@ export default function FacultyDashboard() {
                 </Card>
 
                 <Card>
-                    <CardHeader><CardTitle>Overall Status Distribution</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle>Overall Status Distribution</CardTitle>
+                    </CardHeader>
                     <CardContent className="h-80 flex items-center justify-center">
                         {hasPieData ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                    <Pie data={pieData} cx="50%" cy="50%" outerRadius={120} dataKey="value" label>
-                                        {pieData.map((entry) => {
-                                            const color =
-                                                entry.name === "Pending" ? "#eab308" :
-                                                    entry.name === "Resolved" ? "#22c55e" : "#3b82f6";
-                                            return <Cell key={entry.name} fill={color} />;
-                                        })}
+                                    <Pie
+                                        data={pieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        outerRadius={120}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        label
+                                    >
+                                        {pieData.map((entry) => (
+                                            <Cell
+                                                key={entry.key}
+                                                fill={PIE_COLORS[entry.key] || "#8884d8"}
+                                            />
+                                        ))}
                                     </Pie>
                                     <Tooltip />
                                     <Legend />
@@ -454,51 +730,108 @@ export default function FacultyDashboard() {
                 </Card>
             </section>
 
-            {/* Recent complaints */}
             <Card>
-                <CardHeader className="flex items-center justify-between">
+                <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <CardTitle>Recent Complaints</CardTitle>
-                    <Tabs defaultValue="all">
-                        <TabsList>
-                            <TabsTrigger value="all" onClick={() => setStatus("all")}>All</TabsTrigger>
-                            <TabsTrigger value="pending" onClick={() => setStatus("pending")}>Pending</TabsTrigger>
-                            <TabsTrigger value="in-progress" onClick={() => setStatus("in-progress")}>In-Progress</TabsTrigger>
-                            <TabsTrigger value="resolved" onClick={() => setStatus("resolved")}>Resolved</TabsTrigger>
-                        </TabsList>
-                    </Tabs>
+                    <div className="flex items-center gap-3">
+                        <Badge variant="outline">Merged/Duplicates: {mergedCount}</Badge>
+                        <Tabs value={status} onValueChange={setStatus}>
+                            <TabsList>
+                                <TabsTrigger value="all">All</TabsTrigger>
+                                <TabsTrigger value="pending">Pending</TabsTrigger>
+                                <TabsTrigger value="in-progress">In-Progress</TabsTrigger>
+                                <TabsTrigger value="resolved">Resolved</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                    </div>
                 </CardHeader>
+
                 <CardContent>
-                    <div className="rounded-md border">
+                    <div className="rounded-md border overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Title</TableHead>
-                                    <TableHead>Tag(s)</TableHead>
+                                    <TableHead>Tags</TableHead>
+                                    <TableHead>Location</TableHead>
+                                    <TableHead>Priority</TableHead>
+                                    <TableHead>Support</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Created</TableHead>
                                 </TableRow>
                             </TableHeader>
+
                             <TableBody>
-                                {(filteredQueries || []).map((q) => (
-                                    <TableRow
-                                        key={q._id}
-                                        className="cursor-pointer hover:bg-accent/40"
-                                        onClick={() => navigate(`/queries/${q._id}`)}
-                                    >
-                                        <TableCell className="font-medium">{q.title}</TableCell>
-                                        <TableCell>{Array.isArray(q.tags) ? q.tags.join(", ") : q.tag || "-"}</TableCell>
-                                        <TableCell>
-                                            {q.status === "resolved" && <Badge className="bg-green-600">Resolved</Badge>}
-                                            {q.status === "pending" && <Badge className="bg-yellow-500">Pending</Badge>}
-                                            {q.status === "in-progress" && <Badge className="bg-blue-500">In-Progress</Badge>}
-                                        </TableCell>
-                                        <TableCell>{q.createdAt ? new Date(q.createdAt).toLocaleDateString() : "-"}</TableCell>
-                                    </TableRow>
-                                ))}
-                                {!loading && (filteredQueries || []).length === 0 && (
+                                {visibleQueries.map((q) => {
+                                    const location = [q.hostel, q.block, q.floor, q.roomNumber]
+                                        .filter(Boolean)
+                                        .join(" / ");
+
+                                    return (
+                                        <TableRow
+                                            key={q._id}
+                                            className="cursor-pointer hover:bg-accent/40"
+                                            onClick={() => navigate(`/queries/${q._id}`)}
+                                        >
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    <span>{q.title}</span>
+                                                    {(q.duplicateOf || q.isMerged) && (
+                                                        <Badge variant="outline">Merged</Badge>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+
+                                            <TableCell>
+                                                {Array.isArray(q.tags) && q.tags.length ? q.tags.join(", ") : q.tag || "-"}
+                                            </TableCell>
+
+                                            <TableCell>
+                                                <div className="text-sm">
+                                                    <div>{location || "-"}</div>
+                                                    <div className="text-muted-foreground">{q.scope || "-"}</div>
+                                                </div>
+                                            </TableCell>
+
+                                            <TableCell>
+                                                <Badge className={PRIORITY_BADGE[q.priority] || "bg-slate-500"}>
+                                                    {q.priority || "medium"}
+                                                </Badge>
+                                            </TableCell>
+
+                                            <TableCell>{q.supportCount || 1}</TableCell>
+
+                                            <TableCell>
+                                                {q.status === "resolved" && (
+                                                    <Badge className="bg-green-600">Resolved</Badge>
+                                                )}
+                                                {q.status === "pending" && (
+                                                    <Badge className="bg-yellow-500">Pending</Badge>
+                                                )}
+                                                {q.status === "in-progress" && (
+                                                    <Badge className="bg-blue-500">In-Progress</Badge>
+                                                )}
+                                            </TableCell>
+
+                                            <TableCell>
+                                                {q.createdAt ? new Date(q.createdAt).toLocaleDateString() : "-"}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+
+                                {!loading && visibleQueries.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                                        <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
                                             No complaints found
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+
+                                {loading && (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                                            Loading complaints...
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -510,4 +843,3 @@ export default function FacultyDashboard() {
         </div>
     );
 }
-

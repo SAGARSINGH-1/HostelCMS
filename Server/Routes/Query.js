@@ -11,6 +11,8 @@ import {
     getQueryById,
     getQueryStats,
     updateQueryStatusFaculty,
+    voteQuery,
+    viewVotes,
 } from "../Controller/Query.js";
 
 const router = express.Router();
@@ -38,6 +40,10 @@ router.delete("/queries/:id", deleteQuery);
 // Stats and details
 router.get("/queries/stats", getQueryStats);
 router.get("/queries/:id", getQueryById);
+
+// voting routes
+router.post("/queries/:id/vote", protect(), voteQuery);
+router.get("/queries/:id/viewvotes", protect(), viewVotes);
 
 // Faculty-only status update
 router.put("/queries/:id/status", protect(["faculty"]), updateQueryStatusFaculty);

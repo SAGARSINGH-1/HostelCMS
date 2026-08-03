@@ -6,13 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
-import {
-    Select,
-    SelectTrigger,
-    SelectValue,
-    SelectContent,
-    SelectItem,
-} from "../components/ui/select";
+import CustomSelect from "../components/ui/CustomSelect";
 import { useDispatch } from "react-redux";
 import { loginSuccess } from "../store/authSlice";
 import { toast } from "sonner";
@@ -70,21 +64,18 @@ export default function Login() {
                         {/* Role */}
                         <div>
                             <Label>Role</Label>
-                            <Select
-                                defaultValue={role}
-                                onValueChange={(value) => {
+                            <CustomSelect
+                                value={role}
+                                onChange={(value) => {
                                     setRole(value);
                                     setValue("role", value);
                                 }}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select role" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="student">Student</SelectItem>
-                                    <SelectItem value="faculty">Faculty</SelectItem>
-                                </SelectContent>
-                            </Select>
+                                options={[
+                                    { label: "Student", value: "student" },
+                                    { label: "Faculty", value: "faculty" },
+                                ]}
+                                placeholder="Select role"
+                            />
                         </div>
 
                         <div>

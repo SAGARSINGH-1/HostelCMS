@@ -15,7 +15,12 @@ const facultySchema = new mongoose.Schema(
         email: { type: String, required: true, unique: true, index: true },
         password: { type: String, required: true },
         department: { type: String, required: true },
-        designation: { type: String, required: true },
+        categories: {
+            type: [String],
+            required: true,
+            default: [],
+            set: (vals) => vals.map(v => v.toLowerCase().trim()),
+        },
         phone: String,
         role: { type: String, default: "faculty" },
     },
